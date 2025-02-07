@@ -1,39 +1,54 @@
-import { useEffect, useState } from "react";
-import type { Schema } from "../amplify/data/resource";
-import { generateClient } from "aws-amplify/data";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import SigningPage from "./views/SigningPage";
+import HomePage from "./views/HomePage";
+import { useState } from "react";
+import "./assets/styles/app.css";
+import SignupPage from "./views/SignupPage";
 
-const client = generateClient<Schema>();
+type ProtectedRouteProps = {
+  children: React.ReactNode;
+};
 
-function App() {
-  const [todos, setTodos] = useState<Array<Schema["Todo"]["type"]>>([]);
+function App(): JSX.Element {
+  const [token, setToken] = useState("");
 
-  useEffect(() => {
-    client.models.Todo.observeQuery().subscribe({
-      next: (data) => setTodos([...data.items]),
+  const fakeAuth = (): Promise<string> =>
+    new Promise((resolve) => {
+      setTimeout(() => resolve("2342f2f1d131rf12"), 250);
     });
-  }, []);
 
-  function createTodo() {
-    client.models.Todo.create({ content: window.prompt("Todo content") });
-  }
+  const handleLogin = async () => {
+    const jwt = await fakeAuth();
+
+    console.log("token", token);
+
+    setToken(jwt);
+  };
+
+  const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+    if (!token) {
+      return <Navigate to="/signin" replace />;
+    }
+
+    return children;
+  };
 
   return (
-    <main>
-      <h1>My todos</h1>
-      <button onClick={createTodo}>+ new</button>
-      <ul>
-        {todos.map((todo) => (
-          <li key={todo.id}>{todo.content}</li>
-        ))}
-      </ul>
-      <div>
-        🥳 App successfully hosted. Try creating a new todo.
-        <br />
-        <a href="https://docs.amplify.aws/react/start/quickstart/#make-frontend-updates">
-          Review next step of this tutorial.
-        </a>
-      </div>
-    </main>
+    <BrowserRouter>
+      <Routes>
+        <Route
+          index
+          element={
+            <ProtectedRoute>
+              <HomePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route path="/signin" element={<SigningPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
