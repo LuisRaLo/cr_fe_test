@@ -1,17 +1,18 @@
 import { Fragment } from "react";
-import useAuthStore from "./store/AuthStore";
+
 import RouterComponent from "./routes";
 import SpinnerComponent from "./components/SpinnerComponent";
-import "@aws-amplify/ui-react/styles.css";
 
 import "./assets/styles/app.css";
+
+import useAuthStore from "./store/AuthStore";
 
 function App(): JSX.Element {
   const authStore = useAuthStore((state) => state);
 
   return (
     <Fragment>
-      <RouterComponent idToken={authStore.jwt} />
+      <RouterComponent idToken={authStore.token} />
 
       <SpinnerComponent show={authStore.isFetching} />
     </Fragment>

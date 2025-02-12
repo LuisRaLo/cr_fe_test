@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 
 type ProtectedRouteProps = {
   children: ReactNode;
-  idToken: string | undefined;
+  idToken: string | null;
 };
 
 const ProtectedRoute = ({ children, idToken }: ProtectedRouteProps) => {

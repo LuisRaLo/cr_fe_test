@@ -2,7 +2,7 @@ import { Navigate } from "react-router-dom";
 
 type PublicRouteProps = {
   children: React.ReactNode;
-  idToken: string | undefined;
+  idToken: string | null;
 };
 
 const PublicRoute = ({ children, idToken }: PublicRouteProps) => {

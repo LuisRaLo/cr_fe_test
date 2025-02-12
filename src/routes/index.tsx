@@ -6,7 +6,7 @@ import SigningPage from "../views/SigningPage";
 import SignupPage from "../views/SignupPage";
 
 type IRoutesProps = {
-  idToken: string | undefined;
+  idToken: string | null;
 };
 
 export default function RouterComponent({
