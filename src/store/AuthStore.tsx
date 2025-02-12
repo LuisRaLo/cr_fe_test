@@ -1,26 +1,25 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import CONSTANTS from "../domain/constants";
-import axios from "axios";
 import { ConfirmSignUpRequest, SignUpRequest } from "../hooks/useSignUp";
 import {
+  MFAAuthChallengeRequest,
   SignIn,
   SignInMFA,
-  SignInMFAResponse,
   SignInRequest,
-  SignInResponse,
 } from "../hooks/useSignIn";
+import { getRequest, postRequest } from "../utils/axios";
+import CONSTANTS from "../domain/constants";
 
 export interface IConfirmMFRequest {
   user: string;
   authenticator_code: string;
   session: string;
 }
+
 export interface IAuthenticationState {
   token: string | null;
   session: SignIn | SignInMFA | null;
   challengeName: string[];
-
   isFetching: boolean;
   authError: string;
   authStep:
@@ -32,14 +31,17 @@ export interface IAuthenticationState {
     | "";
   showModalToConfirm: boolean;
 
+  // Métodos de la tienda (acciones)
   signin: (payload: SignInRequest) => Promise<void>;
   signup: (payload: SignUpRequest) => Promise<void>;
   confirmSignup: (payload: ConfirmSignUpRequest) => Promise<void>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  confirmMFA: (payload: MFAAuthChallengeRequest) => Promise<any>;
   signout: () => void;
   setSession: (session: SignIn | SignInMFA) => void;
+  getMFASecret: () => Promise<string>;
   verifyMFA: (user: string, authenticator_code: string) => Promise<void>;
   setChallenges: (challengeName: string[]) => void;
-
   setShowModalToConfirm: (showModalToConfirm: boolean) => void;
   setJWT: (jwt: string | null) => void;
   setIsFetching: (isFetching: boolean) => void;
@@ -57,228 +59,196 @@ const useAuthStore = create<IAuthenticationState>()(
       authStep: "",
       showModalToConfirm: false,
 
-      setShowModalToConfirm: (showModalToConfirm: boolean) => {
-        set({ showModalToConfirm });
-      },
+      setShowModalToConfirm: (showModalToConfirm) =>
+        set({ showModalToConfirm }),
 
-      setJWT: (token: string | null) => set({ token }),
+      setJWT: (token) => set({ token }),
 
-      setIsFetching: (isFetching: boolean) => set({ isFetching }),
+      setIsFetching: (isFetching) => set({ isFetching }),
 
       resetAuthError: () => set({ authError: "" }),
-      resetSession: () => set({ session: null }),
 
-      setSession: (session: SignIn | SignInMFA) => {
-        set({ session });
-      },
+      setSession: (session) => set({ session }),
 
-      setChallenges: (challengeName: string[]) => set({ challengeName }),
+      setChallenges: (challengeName) => set({ challengeName }),
 
-      signin: async (payload: SignInRequest) => {
+      // Función para iniciar sesión
+      signin: async (payload) => {
+        const { isFetching } = get();
+        if (isFetching) return;
+
+        set({ isFetching: true, authError: "" });
+
         try {
-          set({ isFetching: true });
-
           const url = CONSTANTS.BASE_URL + CONSTANTS.SIGNIN;
+          const response = await postRequest(url, {
+            user: payload.user,
+            password: payload.password,
+          });
 
-          const req = await axios.post(
-            url,
-            {
-              user: payload.user,
-              password: payload.password,
-            },
-            {
-              headers: {
-                "Content-Type": "application/json",
-              },
-              validateStatus: function (status: number) {
-                return status >= 200 && status < 500;
-              },
-            }
-          );
-
-          const data: SignInResponse | SignInMFAResponse = req.data;
-
-          if (req.status === 200) {
-            if (Object.keys(data.resultado).includes("session")) {
-              set({ session: (data as SignInMFAResponse).resultado });
-              set({
-                challengeName: [
-                  ...get().challengeName,
-                  (data as SignInMFAResponse).resultado.challenge_name,
-                ],
-              });
-            } else {
-              set({
-                token: (data as SignInResponse).resultado.authentication_result
-                  .AccessToken,
-                session: data.resultado,
-              });
-            }
-            return;
-          }
-
-          throw new Error(req.data.resultado);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (error: any) {
-          console.error(error);
-
-          set({ authError: error.message });
-        } finally {
-          set({ isFetching: false });
-        }
-      },
-
-      signup: async (payload: SignUpRequest): Promise<void> => {
-        try {
-          set({ isFetching: true });
-
-          const url = CONSTANTS.BASE_URL + CONSTANTS.SIGNUP;
-
-          console.log("url", url);
-
-          const req = await axios.post(
-            url,
-            {
-              email: payload.email,
-              password: payload.password,
-              repeat_password: payload.repeatPassword,
-              name: payload.name,
-            },
-            {
-              headers: {
-                "Content-Type": "application/json",
-              },
-              validateStatus: function (status: number) {
-                return status >= 200 && status < 500;
-              },
-            }
-          );
-
-          if (req.status === 200) {
-            set({ authStep: "CONFIRM_SIGN_UP" });
-            set({ showModalToConfirm: true });
-            return;
-          }
-
-          throw new Error(req.data.resultado);
-
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (error: any) {
-          console.error(error);
-
-          set({ authError: error.message });
-        } finally {
-          set({ isFetching: false });
-        }
-      },
-
-      confirmSignup: async (payload: ConfirmSignUpRequest) => {
-        try {
-          set({ isFetching: true });
-
-          const url = CONSTANTS.BASE_URL + CONSTANTS.CONFIRM_SIGN_UP;
-
-          const req = await axios.post(
-            url,
-            {
-              user: payload.email,
-              confirmation_code: payload.code,
-            },
-            {
-              headers: {
-                "Content-Type": "application/json",
-              },
-              validateStatus: function (status: number) {
-                return status >= 200 && status < 500;
-              },
-            }
-          );
-
-          if (req.status === 200) {
-            set({ authStep: "CONFIRMED_SIGN_UP" });
-            set({ showModalToConfirm: false });
-
-            return;
-          }
-
-          throw new Error(req.data.resultado);
-        } catch (error) {
-          console.error(error);
-        } finally {
-          set({ isFetching: false });
-        }
-      },
-
-      signout: () => {
-        set({ token: null, session: null, challengeName: [] });
-      },
-
-      verifyMFA: async (
-        user: string,
-        authenticator_code: string
-      ): Promise<void> => {
-        try {
-          set({ isFetching: true });
-
-          const url = CONSTANTS.BASE_URL + CONSTANTS.MFA_VERIFY;
-
-          const req = await axios.post(
-            url,
-            {
-              user: user,
-              authenticator_code: authenticator_code,
-              session: (useAuthStore.getState().session as SignInMFA).session,
-            },
-            {
-              headers: {
-                "Content-Type": "application/json",
-              },
-              validateStatus: function (status: number) {
-                return status >= 200 && status < 500;
-              },
-            }
-          );
-
-          const data = req.data;
-
-          if (req.status === 200) {
+          const { resultado } = response.data;
+          if ("session" in resultado) {
             set({
-              token: (data as SignInResponse).resultado.authentication_result
-                .AccessToken,
+              session: resultado,
+              challengeName: [...get().challengeName, resultado.challenge_name],
             });
-            set({ session: (data as SignInResponse).resultado });
+          } else {
+            set({
+              token: resultado.authentication_result.AccessToken,
+              session: resultado,
+            });
+          }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (error: any) {
+          console.error("SignIn Error:", error);
+          set({ authError: error.message || "An error occurred" });
+        } finally {
+          set({ isFetching: false });
+        }
+      },
 
-            set({ authStep: "MFA_CONFIRMED" });
+      // Función para registrar
+      signup: async (payload) => {
+        set({ isFetching: true, authError: "" });
 
-            return;
-          } else if (req.status == 400) {
-            console.log("ENTRE AQUI");
-            data?.resultado == "Sesión no válida o expirada." &&
-              set({ authError: "Sesión no válida o expirada." });
+        try {
+          const url = CONSTANTS.BASE_URL + CONSTANTS.SIGNUP;
+          const response = await postRequest(url, {
+            email: payload.email,
+            password: payload.password,
+            repeat_password: payload.repeatPassword,
+            name: payload.name,
+          });
 
-            set({ session: null });
-
-            return;
+          if (response.status === 200) {
+            set({ authStep: "CONFIRM_SIGN_UP", showModalToConfirm: true });
           }
 
-          throw new Error(req.data.resultado);
-        } catch (error) {
-          console.error(error);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (error: any) {
+          console.error("SignUp Error:", error);
+          set({ authError: error.message || "An error occurred" });
+        } finally {
+          set({ isFetching: false });
+        }
+      },
+
+      // Confirmar registro
+      confirmSignup: async (payload) => {
+        set({ isFetching: true, authError: "" });
+
+        try {
+          const url = CONSTANTS.BASE_URL + CONSTANTS.CONFIRM_SIGN_UP;
+          const response = await postRequest(url, {
+            user: payload.email,
+            confirmation_code: payload.code,
+          });
+
+          if (response.status === 200) {
+            set({ authStep: "CONFIRMED_SIGN_UP", showModalToConfirm: false });
+          }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (error: any) {
+          console.error("ConfirmSignUp Error:", error);
+          set({ authError: error.message || "An error occurred" });
+        } finally {
+          set({ isFetching: false });
+        }
+      },
+
+      // Cerrar sesión
+      signout: () => set({ token: null, session: null, challengeName: [] }),
+
+      // Verificar MFA
+      verifyMFA: async (user, authenticator_code) => {
+        set({ isFetching: true, authError: "" });
+
+        try {
+          const url = CONSTANTS.BASE_URL + CONSTANTS.MFA_VERIFY;
+          const session = get().session as SignInMFA;
+          const response = await postRequest(url, {
+            user,
+            authenticator_code,
+            session: session?.session,
+          });
+
+          if (response.status === 200) {
+            const { resultado } = response.data;
+            set({
+              token: resultado.authentication_result.AccessToken,
+              session: resultado,
+              authStep: "MFA_CONFIRMED",
+            });
+          }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (error: any) {
+          console.error("VerifyMFA Error:", error);
+          set({ authError: error.message || "An error occurred" });
+        } finally {
+          set({ isFetching: false });
+        }
+      },
+
+      // Función para registrar
+      getMFASecret: async () => {
+        set({ isFetching: true, authError: "" });
+
+        try {
+          const url = CONSTANTS.BASE_URL + CONSTANTS.MFA_CODE;
+          const token = get().token;
+
+          if (!token) {
+            throw new Error("Token is null");
+          }
+
+          const response = await getRequest(url, token);
+
+          if (response.status === 200) {
+            return response.data.resultado.secret;
+          }
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (error: any) {
+          console.error("SignUp Error:", error);
+          return "Ha ocurrido un error";
+        } finally {
+          set({ isFetching: false });
+        }
+      },
+
+      // Confirmar MFA
+      confirmMFA: async (payload: MFAAuthChallengeRequest) => {
+        set({ isFetching: true, authError: "" });
+
+        try {
+          const url = CONSTANTS.BASE_URL + CONSTANTS.MFA_CHALLENGE;
+          const response = await postRequest(url, {
+            mfa_code: payload.mfa_code,
+            access_token: payload.access_token,
+          });
+
+          if (response.status === 200) {
+            console.log("ConfirmMFA Response:", response.data);
+            return response.data;
+          }
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (error: any) {
+          console.error("ConfirmMFA Error:", error);
+          return error.message || "An error occurred";
         } finally {
           set({ isFetching: false });
         }
       },
     }),
     {
-      name: "token",
+      name: "auth-storage",
       storage: createJSONStorage(() => sessionStorage),
-      partialize(state) {
-        return {
-          session: state.session,
-          challenges: state.challengeName,
-          token: state.token,
-        };
-      },
+      partialize: (state) => ({
+        session: state.session,
+        challengeName: state.challengeName,
+        token: state.token,
+      }),
     }
   )
 );

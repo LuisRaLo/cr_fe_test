@@ -33,6 +33,11 @@ export type SignInMFAResponse = {
   resultado: SignInMFA;
 };
 
+export type MFAAuthChallengeRequest = {
+  mfa_code: string;
+  access_token: string;
+};
+
 export default function useSignIn(authStore: IAuthenticationState) {
   const [isShowPassword, setIsShowPassword] = useState<boolean>(false);
   const [signInRequest, setSignInRequest] = useState<SignInRequest>({
