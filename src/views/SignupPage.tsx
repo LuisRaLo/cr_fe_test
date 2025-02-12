@@ -1,4 +1,4 @@
-import { FormEvent, Fragment, useEffect } from "react";
+import { Fragment, useEffect } from "react";
 import useAuthStore from "../store/AuthStore";
 import SpinnerComponent from "../components/SpinnerComponent";
 import ModalComponent from "../components/ModalComponent";
@@ -14,17 +14,9 @@ export default function SignupPage(): JSX.Element {
     isValidateSignUpRequest,
     setSignUpRequest,
     setConfirmSignUpRequest,
-  } = useSignUp();
-
-  const handleSubmit = async (e: FormEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-
-    await authStore.signup(signUpRequest);
-  };
-
-  async function handleConfirm() {
-    await authStore.confirmSignup(confirmSignUpRequest);
-  }
+    handleConfirm,
+    handleSubmit,
+  } = useSignUp(authStore);
 
   useEffect(() => {
     if (authStore.authStep === "CONFIRMED_SIGN_UP") {
@@ -54,12 +46,17 @@ export default function SignupPage(): JSX.Element {
                   type="email"
                   name="email"
                   id="email"
-                  onInput={(e) =>
+                  onInput={(e) => {
                     setSignUpRequest({
                       ...signUpRequest,
                       email: e.currentTarget.value,
-                    })
-                  }
+                    });
+
+                    setConfirmSignUpRequest({
+                      ...confirmSignUpRequest,
+                      email: e.currentTarget.value,
+                    });
+                  }}
                   value={signUpRequest.email}
                   className="bg-gray-50 border border-gray-300 rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5"
                   placeholder="email or phone"

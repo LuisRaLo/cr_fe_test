@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { IAuthenticationState } from "../store/AuthStore";
 
 export type SignUpRequest = {
   email: string;
@@ -12,7 +13,7 @@ export type ConfirmSignUpRequest = {
   code: string;
 };
 
-export default function useSignUp() {
+export default function useSignUp(authStore: IAuthenticationState) {
   const [signUpRequest, setSignUpRequest] = useState<SignUpRequest>({
     email: "creze.test2@yopmail.com",
     name: "TEST " + (Math.random() * 1000).toFixed(0),
@@ -54,6 +55,16 @@ export default function useSignUp() {
     return false;
   }
 
+  const handleSubmit = async (e: FormEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+
+    await authStore.signup(signUpRequest);
+  };
+
+  async function handleConfirm() {
+    await authStore.confirmSignup(confirmSignUpRequest);
+  }
+
   useEffect(() => {
     if (validateSignUpRequest(signUpRequest)) {
       setIsValidateSignUpRequest(true);
@@ -76,5 +87,7 @@ export default function useSignUp() {
     setConfirmSignUpRequest,
     setIsValidateSignUpRequest,
     setIsValidateConfirmSignUpRequest,
+    handleConfirm,
+    handleSubmit,
   };
 }

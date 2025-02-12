@@ -90,6 +90,11 @@ const useAuthStore = create<IAuthenticationState>()(
 
           const { resultado, mensaje } = response.data;
 
+          if (response.status === 404) {
+            set({ authError: "Usuario no encontrado" });
+            return;
+          }
+
           if (mensaje === "Usuario no confirmado.") {
             set({
               authStep: "CONFIRM_SIGN_UP",
@@ -131,6 +136,13 @@ const useAuthStore = create<IAuthenticationState>()(
             repeat_password: payload.repeatPassword,
             name: payload.name,
           });
+
+          const { resultado } = response.data;
+
+          if (resultado === "El usuario ya existe.") {
+            set({ authError: resultado });
+            return;
+          }
 
           if (response.status === 200) {
             set({ authStep: "CONFIRM_SIGN_UP", showModalToConfirm: true });
