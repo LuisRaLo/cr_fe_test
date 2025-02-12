@@ -1,94 +1,122 @@
-import {
-  signIn,
-  SignInInput,
-  SignInOutput,
-  signUp,
-  SignUpInput,
-  SignUpOutput,
-  ConfirmSignUpInput,
-  confirmSignUp,
-} from "aws-amplify/auth";
 import { create } from "zustand";
+import CONSTANTS from "../domain/constants";
+import axios from "axios";
+import { ConfirmSignUpRequest, SignUpRequest } from "../hooks/useSignUp";
 
-interface IAuthenticationState {
-  user: any;
+export interface IAuthenticationState {
   jwt: string;
-  setUser: (user: any) => void;
-  setJwt: (jwt: string) => void;
-  logout: () => void;
-  signin: (email: string, password: string) => void;
-  signup: (
-    email: string,
-    password: string,
-    repeatPassword: string,
-    name: string
-  ) => void;
+  isFetching: boolean;
+  authError: string;
+  authStep: "CONFIRM_SIGN_UP" | "DONE" | "CONFIRMED_SIGN_UP" | "";
+  showModalToConfirm: boolean;
+
+  signup: (payload: SignUpRequest) => Promise<void>;
+  confirmSignup: (payload: ConfirmSignUpRequest) => Promise<void>;
+
+  setShowModalToConfirm: (showModalToConfirm: boolean) => void;
+  setJWT: (jwt: string) => void;
+  setIsFetching: (isFetching: boolean) => void;
+  resetAuthError: () => void;
+  signin: (email: string, password: string) => Promise<void>;
 }
 
 const useAuthStore = create<IAuthenticationState>()((set) => ({
-  user: null,
   jwt: "",
-  setUser: (user: any) => set({ user }),
-  setJwt: (jwt: any) => set({ jwt }),
-  logout: () => set({ user: null, jwt: "" }),
+  isFetching: false,
+  authError: "",
+  authStep: "",
+  showModalToConfirm: false,
 
-  signin: async (email: string, password: string) => {
-    const data: SignInInput = {
-      username: email,
-      password,
-      options: {
-        authFlowType: "USER_PASSWORD_AUTH",
-      },
-    };
+  setShowModalToConfirm: (showModalToConfirm: boolean) => {
+    set({ showModalToConfirm });
+  },
 
+  setJWT: (jwt: string) => set({ jwt }),
+
+  setIsFetching: (isFetching: boolean) => set({ isFetching }),
+
+  resetAuthError: () => set({ authError: "" }),
+
+  signin: async (payload: any) => {},
+
+  signup: async (payload: SignUpRequest): Promise<void> => {
     try {
-      const { nextStep, isSignedIn }: SignInOutput = await signIn(data);
+      set({ isFetching: true });
 
-      console.log("isSignedIn", isSignedIn, nextStep);
+      const url = CONSTANTS.BASE_URL + CONSTANTS.SIGNUP;
 
-      if (nextStep.signInStep === "DONE") {
-        console.log("user", nextStep);
+      console.log("url", url);
+
+      const req = await axios.post(
+        url,
+        {
+          email: payload.email,
+          password: payload.password,
+          repeat_password: payload.repeatPassword,
+          name: payload.name,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          validateStatus: function (status: number) {
+            return status >= 200 && status < 500;
+          },
+        }
+      );
+
+      if (req.status === 200) {
+        set({ authStep: "CONFIRM_SIGN_UP" });
+        set({ showModalToConfirm: true });
+        return;
       }
 
-      const confirmData: ConfirmSignUpInput = {
-        username: email,
-        confirmationCode: "123456",
-      };
+      throw new Error(req.data.resultado);
 
-      const confirmSignUpOutput = await confirmSignUp(confirmData);
-    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
       console.error(error);
+
+      set({ authError: error.message });
+    } finally {
+      set({ isFetching: false });
     }
   },
 
-  signup: async (
-    email: string,
-    password: string,
-    repeatPassword: string,
-    name: string
-  ) => {
-    console.log(email, password, repeatPassword, name);
-
-    const data: SignUpInput = {
-      username: email,
-      password,
-      options: {
-        userAttributes: {
-          name,
-        },
-      },
-    };
-
+  confirmSignup: async (payload: ConfirmSignUpRequest) => {
     try {
-      const { nextStep, isSignUpComplete }: SignUpOutput = await signUp(data);
+      set({ isFetching: true });
 
-      console.log("isSignedIn", isSignUpComplete, nextStep);
+      const url = CONSTANTS.BASE_URL + CONSTANTS.CONFIRM_SIGN_UP;
 
-      if (nextStep.signUpStep === "DONE") {
-        console.log("user", nextStep);
+      const req = await axios.post(
+        url,
+        {
+          user: payload.email,
+          confirmation_code: payload.code,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          validateStatus: function (status: number) {
+            return status >= 200 && status < 500;
+          },
+        }
+      );
+
+      if (req.status === 200) {
+        set({ authStep: "CONFIRMED_SIGN_UP" });
+        set({ showModalToConfirm: false });
+
+        return;
       }
+
+      throw new Error(req.data.resultado);
     } catch (error) {
       console.error(error);
+    } finally {
+      set({ isFetching: false });
     }
   },
 }));
