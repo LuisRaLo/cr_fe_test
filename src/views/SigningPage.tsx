@@ -18,9 +18,22 @@ export default function SigningPage(): JSX.Element {
 
   const [challengeModal, setChallengeModal] = useState<boolean>(false);
   const [mfaCode, setMFACode] = useState<string>("");
+  const [logoutModal, setLogoutModal] = useState<boolean>(false);
 
   async function handleVerifyMFA() {
-    await authStore.verifyMFA(signInRequest.user, mfaCode);
+    if (
+      authStore.session &&
+      Object.keys(authStore.session).includes("session")
+    ) {
+      console.log("MFA_CONFIRMED");
+      await authStore.verifyMFA(signInRequest.user, mfaCode);
+    } else {
+      console.log("CONFIRM_SIGNUP");
+      await authStore.confirmSignup({
+        code: mfaCode,
+        email: signInRequest.user,
+      });
+    }
   }
 
   useEffect(() => {
@@ -28,6 +41,21 @@ export default function SigningPage(): JSX.Element {
       ? setChallengeModal(true)
       : setChallengeModal(false);
   }, [authStore.session]);
+
+  useEffect(() => {
+    if (authStore.authError === "Usuario no confirmado.") {
+      setChallengeModal(true);
+      authStore.resetAuthError();
+    }
+  }, [authStore.authError, authStore]);
+
+  useEffect(() => {
+    if (authStore.authStep === "MFA_CONFIRMED") {
+      setChallengeModal(false);
+      authStore.resetAuthError();
+      setLogoutModal(true);
+    }
+  }, [authStore.authError, authStore]);
 
   return (
     <Fragment>
@@ -174,6 +202,54 @@ export default function SigningPage(): JSX.Element {
             className="w-full flex items-center justify-center text-white bg-blue-900 hover:bg-primary-700 disabled:bg-primary-100 focus:ring-4 focus:outline-none focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5"
           >
             Confirm
+          </button>
+        </div>
+      </ModalComponent>
+
+      <ModalComponent
+        isOpen={authStore.authError !== ""}
+        title="Error"
+        onClose={() => authStore.resetAuthError()}
+      >
+        {authStore.authError === "401" ? (
+          <div>
+            <p className="text-sm font-light">
+              The code entered is incorrect, please try again
+            </p>
+
+            <button
+              type="button"
+              onClick={() => authStore.resendMFACode(signInRequest.user)}
+              className="w-full mt-10 flex items-center justify-center text-white bg-blue-900 hover:bg-primary-700 disabled:bg-primary-100 focus:ring-4 focus:outline-none focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5"
+            >
+              Resend code
+            </button>
+          </div>
+        ) : (
+          <div>
+            <p className="text-sm font-light">{authStore.authError}</p>
+          </div>
+        )}
+      </ModalComponent>
+
+      <ModalComponent
+        isOpen={logoutModal}
+        title="Error"
+        onClose={() => setLogoutModal(false)}
+      >
+        <div>
+          <p className="text-sm font-light">
+            You have successfully signed in. Please sign out and sign in again
+          </p>
+
+          <button
+            type="button"
+            onClick={() => {
+              authStore.signout();
+            }}
+            className="w-full mt-10 flex items-center justify-center text-white bg-blue-900 hover:bg-primary-700 disabled:bg-primary-100 focus:ring-4 focus:outline-none focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5"
+          >
+            Sign out
           </button>
         </div>
       </ModalComponent>

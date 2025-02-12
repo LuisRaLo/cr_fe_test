@@ -11,7 +11,7 @@ type IRoutesProps = {
 
 export default function RouterComponent({
   idToken,
-}: IRoutesProps): JSX.Element {
+}: Readonly<IRoutesProps>): JSX.Element {
   return (
     <BrowserRouter>
       <Routes>

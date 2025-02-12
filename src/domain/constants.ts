@@ -7,6 +7,7 @@ const CONSTANTS = {
   MFA_VERIFY: "/auth/mfa/verify",
   MFA_CODE: "/auth/mfa/code",
   MFA_CHALLENGE: "/auth/mfa/challenge",
+  MFA_RESEND: "/auth/mfa/resend",
 };
 
 export default CONSTANTS;

@@ -31,7 +31,6 @@ export default function HomePage(): JSX.Element {
   async function handleMFASecret() {
     setShowQRCode(true);
 
-    console.log("Get MFA Secret");
     const getMFASecret = await authStore.getMFASecret();
 
     if (getMFASecret) {

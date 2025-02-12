@@ -46,6 +46,7 @@ export interface IAuthenticationState {
   setJWT: (jwt: string | null) => void;
   setIsFetching: (isFetching: boolean) => void;
   resetAuthError: () => void;
+  resendMFACode: (user: string) => Promise<void>;
 }
 
 const useAuthStore = create<IAuthenticationState>()(
@@ -81,12 +82,23 @@ const useAuthStore = create<IAuthenticationState>()(
 
         try {
           const url = CONSTANTS.BASE_URL + CONSTANTS.SIGNIN;
+
           const response = await postRequest(url, {
             user: payload.user,
             password: payload.password,
           });
 
-          const { resultado } = response.data;
+          const { resultado, mensaje } = response.data;
+
+          if (mensaje === "Usuario no confirmado.") {
+            set({
+              authStep: "CONFIRM_SIGN_UP",
+              showModalToConfirm: true,
+              authError: mensaje,
+            });
+            return;
+          }
+
           if ("session" in resultado) {
             set({
               session: resultado,
@@ -144,9 +156,24 @@ const useAuthStore = create<IAuthenticationState>()(
             confirmation_code: payload.code,
           });
 
+          const { mensaje } = response.data;
+
+          if (
+            mensaje ===
+            "El código de confirmación ha expirado. Se ha enviado un nuevo código a su correo electrónico."
+          ) {
+            set({ authError: mensaje });
+            return;
+          }
+
           if (response.status === 200) {
             set({ authStep: "CONFIRMED_SIGN_UP", showModalToConfirm: false });
+          } else if (response.status === 401) {
+            set({ authError: "401" });
+          } else if (response.status === 429) {
+            set({ authError: "Demasiados intentos, intente más tarde" });
           }
+
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (error: any) {
           console.error("ConfirmSignUp Error:", error);
@@ -228,7 +255,11 @@ const useAuthStore = create<IAuthenticationState>()(
           });
 
           if (response.status === 200) {
-            console.log("ConfirmMFA Response:", response.data);
+            set({
+              authError: "",
+              authStep: "MFA_CONFIRMED",
+            });
+
             return response.data;
           }
 
@@ -236,6 +267,29 @@ const useAuthStore = create<IAuthenticationState>()(
         } catch (error: any) {
           console.error("ConfirmMFA Error:", error);
           return error.message || "An error occurred";
+        } finally {
+          set({ isFetching: false });
+        }
+      },
+
+      resendMFACode: async (user: string) => {
+        set({ isFetching: true, authError: "" });
+
+        try {
+          const url = CONSTANTS.BASE_URL + CONSTANTS.MFA_RESEND;
+
+          const response = await postRequest(url, { user });
+
+          if (response.status === 200) {
+            console.log("ResendMFA Response:", response.data);
+
+            return response.data;
+          }
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (error: any) {
+          console.error("SignUp Error:", error);
+          return "Ha ocurrido un error";
         } finally {
           set({ isFetching: false });
         }
